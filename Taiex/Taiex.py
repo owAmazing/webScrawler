@@ -8,7 +8,7 @@ class TAIEXLongTermSpider:
     def __init__(self):
         self.url = "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST"
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         } 
 
     def fetch_month_data(self, date_str):
@@ -71,43 +71,83 @@ if os.path.exists(file_name):
 
 # --- While 迴圈主體 ---
 while i <= end_year:
+
     # 檢查是否超過目前日期 (2026年4月)
+
     if i == 2026 and j > 4:
+
         print("\n已抓取至 2026-04，任務結束。")
+
         break
+
     
+
     # 同時也要防止超過「今天」的日期（萬一你提早執行）
+
     if i == today.year and j > today.month:
+
         print("\n已超過今日日期，停止抓取。")
+
         break
+
+
 
     date_query = f"{i}{j:02d}01"
+
     print(f"📡 嘗試抓取: {i}-{j:02d} ...", end="\r")
 
+
+
     raw_df = spider.fetch_month_data(date_query)
+
     result_df = spider.clean_and_get_first_day(raw_df, i, j)
 
+
+
     if isinstance(result_df, pd.DataFrame):
+
         print(f"✅ {i}-{j:02d} 成功 | 第一交易日: {result_df['Date'].values[0]} | 開盤: {result_df['Open'].values[0]}")
+
         
+
         header_needed = not os.path.exists(file_name)
+
         result_df.to_csv(file_name, mode='a', index=False, header=header_needed, encoding='utf-8-sig')
+
         
+
         # 推進指標
+
         if j == 12:
+
             j = 1
+
             i += 1
+
         else:
+
             j += 1
+
             
+
         # 建議：證交所爬蟲延遲設為 3-5 秒比較安全，避免被封鎖 IP
+
         time.sleep(0.5)
+
         
+
     elif result_df == "CHECK_ERROR":
+
         print(f"🔄 {i}-{j:02d} 年月檢核失敗，10秒後重試...")
+
         time.sleep(10.0)
+
     else:
+
         print(f"🔄 {i}-{j:02d} 抓取失敗 (None)，15秒後重試...")
+
         time.sleep(15.0)
+
+
 
 print(f"\n🏁 任務完成！資料儲存至 {file_name}")
