@@ -219,10 +219,10 @@ if __name__ == "__main__":
         try:
             from NIKKEIscraper import NIKKEIScraper
             scraper = NIKKEIScraper()
-            price_df = scraper.fetch_price_data(interval="1mo")
-            if price_df is None:
-                raise FileNotFoundError('無法取得價格資料')
+            dataset = scraper.build_dataset(years=15)
+            dataset.to_csv(csv_file)
             scraper.save_data()
+            price_df = dataset
         except Exception as e:
             raise SystemExit(f"無法取得價格資料：{e}")
     else:

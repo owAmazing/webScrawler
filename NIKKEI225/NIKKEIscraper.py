@@ -72,7 +72,17 @@ class NIKKEIScraper:
         except Exception as e:
             print(f"yfinance 估值抓取失敗: {e}")
 
-        # 2. 如果 yfinance/API 沒抓到，再以 HTML 解析 Yahoo key statistics
+        # 2. 嘗試從日經官方 archive 抓取估值資料
+        try:
+            nikkei_val = self._fetch_nikkei_archive_valuation()
+            if nikkei_val:
+                for key, value in nikkei_val.items():
+                    if value is not None and val_data.get(key) in ('N/A', None):
+                        val_data[key] = value
+        except Exception as e:
+            print(f"日經官方 archive 估值抓取失敗: {e}")
+
+        # 3. 如果 yfinance/API 沒抓到，再以 HTML 解析 Yahoo key statistics
         try:
             if val_data['Trailing_PE'] == 'N/A' or val_data['Price_Book'] == 'N/A' or val_data['Dividend_Yield'] == 'N/A' or val_data['CAPE'] == 'N/A':
                 url = f"https://finance.yahoo.com/quote/{self.ticker}/key-statistics"
@@ -89,22 +99,6 @@ class NIKKEIScraper:
                         val_data['CAPE'] = self._parse_value(soup, ['CAPE', 'Cyclically Adjusted P/E', 'Cyclically Adjusted P/E (CAPE)'])
         except Exception as e:
             print(f"Yahoo HTML 估值抓取失敗: {e}")
-
-        # 3. 從日經官方網站抓取最新 PBR / Dividend Yield（可補資料）
-        try:
-            pbr_url = "https://indexes.nikkei.co.jp/en/nkave/archives/data?list=pbr"
-            resp = requests.get(pbr_url, headers=self.headers, timeout=15)
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.text, 'html.parser')
-                table = soup.find('table')
-                if table:
-                    rows = table.find_all('tr')
-                    if len(rows) > 1:
-                        latest = rows[1].find_all('td')
-                        if len(latest) >= 2:
-                            val_data['Price_Book'] = latest[1].text.strip()
-        except Exception as e:
-            print(f"日經官方 PBR 抓取失敗: {e}")
 
         self.valuation_data = val_data
         print("✅ 估值資料抓取完成")
@@ -180,21 +174,109 @@ class NIKKEIScraper:
                         return tds[-1].text.strip()
         return "N/A"
 
+    def _fetch_nikkei_archive_valuation(self):
+        session = requests.Session()
+        session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                          '(KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://indexes.nikkei.co.jp/en/nkave/archives',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        })
+
+        result = {
+            'Trailing_PE': None,
+            'Price_Book': None,
+            'Dividend_Yield': None,
+            'CAPE': None,
+        }
+
+        def parse_last_row(url, expected_cols):
+            resp = session.get(url, timeout=20)
+            if resp.status_code != 200:
+                return None
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            table = soup.find('table')
+            if not table:
+                return None
+            rows = table.find_all('tr')
+            for row in reversed(rows):
+                cols = [td.get_text(strip=True) for td in row.find_all('td')]
+                if len(cols) >= expected_cols and cols[0]:
+                    return cols
+            return None
+
+        try:
+            pbr_cols = parse_last_row('https://indexes.nikkei.co.jp/en/nkave/archives/data?list=pbr', 3)
+            if pbr_cols:
+                result['Trailing_PE'] = pbr_cols[1]
+                result['Price_Book'] = pbr_cols[2]
+        except Exception:
+            pass
+
+        try:
+            div_cols = parse_last_row('https://indexes.nikkei.co.jp/en/nkave/archives/data?list=dividend-yield', 2)
+            if div_cols:
+                result['Dividend_Yield'] = div_cols[1]
+        except Exception:
+            pass
+
+        try:
+            cape_cols = parse_last_row('https://indexes.nikkei.co.jp/en/nkave/archives/data?list=cape', 2)
+            if cape_cols:
+                result['CAPE'] = cape_cols[1]
+        except Exception:
+            pass
+
+        return result
+
     def save_data(self):
         """儲存所有資料到 CSV"""
         if self.price_data is not None:
-            self.price_data.to_csv(f"{self.market_name}_price_max.csv")
+            price_output = self.price_data.copy()
+            if self.valuation_data is not None:
+                for key in ['Trailing_PE', 'Price_Book', 'Dividend_Yield', 'CAPE']:
+                    price_output[key] = self.valuation_data.get(key)
+            price_output.to_csv(f"{self.market_name}_price_max.csv")
             print(f"💾 價格資料已儲存 → {self.market_name}_price_max.csv")
 
         if self.valuation_data is not None:
             pd.DataFrame([self.valuation_data]).to_csv(f"{self.market_name}_basic_info.csv", index=False)
             print(f"💾 基本估值資料已儲存 → {self.market_name}_basic_info.csv")
 
+    def build_dataset(self, years=15):
+        """建立 NIKKEI 225 月度資料集，包含價格與最新估值欄位。"""
+        price_data = self.fetch_price_data(interval="1mo", years=years)
+        if price_data is None:
+            raise RuntimeError("價格資料抓取失敗，無法建立資料集")
+
+        valuation = self.fetch_valuation_data()
+        metrics = {
+            'Trailing_PE': valuation.get('Trailing_PE'),
+            'Price_Book': valuation.get('Price_Book'),
+            'Dividend_Yield': valuation.get('Dividend_Yield'),
+            'CAPE': valuation.get('CAPE'),
+        }
+
+        proxies = pd.DataFrame(
+            {key: [value] * len(price_data) for key, value in metrics.items()},
+            index=price_data.index,
+        )
+
+        dataset = price_data.join(proxies, how='left')
+        return dataset
+
+    def save_dataset(self, dataset):
+        output_path = f"{self.market_name}_dataset.csv"
+        dataset.to_csv(output_path)
+        print(f"💾 合併資料集已儲存 → {output_path}")
+
     def run(self):
         print("🚀 開始抓取 NIKKEI 225 資料...")
-        self.fetch_price_data(interval="1mo", years=15)   # 改 "1d" 或 years 設定可抓不同範圍
-        time.sleep(2.5)
-        self.fetch_valuation_data()
+        dataset = self.build_dataset(years=15)
+        self.save_dataset(dataset)
         self.save_data()
         print("🎉 抓取完成！")
 
