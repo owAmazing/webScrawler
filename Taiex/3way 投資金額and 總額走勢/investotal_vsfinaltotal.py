@@ -16,7 +16,6 @@ def plot_investment_trends_final():
     }
     
     # 顏色配置：深色用於實線(投入)，淺色用於虛線(價值)
-    # 紅色系、藍色系、綠色系
     color_map = {
         "Standard DCA": {"dark": "#8B0000", "light": "#FF6B6B"},    # 深紅 vs 亮紅
         "Fixed Shares": {"dark": "#00008B", "light": "#4D94FF"},    # 深藍 vs 天藍
@@ -42,18 +41,18 @@ def plot_investment_trends_final():
         
         # 繪製總投入 (深色實線)
         plt.plot(df['日期'], df['累計投入'], 
-                 label=f"{label} - 總投入 (深)", 
+                 label=f"{label} - 累計投入 (TWD)", 
                  color=c['dark'], linestyle='-', linewidth=2.0)
         
         # 繪製組合價值 (淺色虛線)
         plt.plot(df['日期'], df['目前持有價值'], 
-                 label=f"{label} - 組合價值 (淺)", 
+                 label=f"{label} - 組合價值 (TWD)", 
                  color=c['light'], linestyle='--', linewidth=1.5)
 
-    # 圖表裝飾
-    plt.title('NIKKEI 225 投資績效趨勢：累積投入 vs 組合價值', fontsize=18, pad=20)
-    plt.xlabel('日期', fontsize=12)
-    plt.ylabel('金額 (JPY)', fontsize=12)
+    # --- 修改標題與標籤 ---
+    plt.title('TAIEX 指數投資績效趨勢：累計投入 vs 組合價值', fontsize=18, pad=20)
+    plt.xlabel('投資日期', fontsize=12)
+    plt.ylabel('金額 (TWD / 台幣)', fontsize=12)
     
     # 格線與圖例
     plt.grid(True, which='both', linestyle=':', alpha=0.4)
@@ -63,10 +62,10 @@ def plot_investment_trends_final():
     plt.tight_layout()
     
     # 儲存與顯示
-    save_path = os.path.join(desktop_path, "Investment_Trend_RGB_Contrast.png")
+    save_path = os.path.join(desktop_path, "TAIEX_Investment_Trend.png")
     plt.savefig(save_path, bbox_inches='tight')
     plt.show()
-    print(f"✅ 最終配色圖表已儲存至桌面: Investment_Trend_RGB_Contrast.png")
+    print(f"✅ TAIEX 趨勢圖表已儲存至桌面: TAIEX_Investment_Trend.png")
 
 if __name__ == "__main__":
     plot_investment_trends_final()
