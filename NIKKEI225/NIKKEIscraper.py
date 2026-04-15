@@ -119,8 +119,8 @@ class NIKKEIScraper:
             else:
                 valuation_df = pd.DataFrame([self.valuation_data])
 
-            valuation_df.to_csv('valuation.csv', index=False)
-            print(f"💾 基本估值資料已儲存 → valuation.csv")
+            valuation_df.to_csv('NIKKEIvaluation.csv', index=False)
+            print(f"💾 基本估值資料已儲存 → NIKKEIvaluation.csv")
 
     def build_dataset(self, years=15):
         """建立 NIKKEI 225 月度資料集，包含價格與最新估值欄位。"""
