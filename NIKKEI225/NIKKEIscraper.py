@@ -2,7 +2,6 @@
 import requests
 import pandas as pd
 import time
-import yfinance as yf
 from datetime import datetime, timedelta
 
 class NIKKEIScraper:
@@ -75,16 +74,27 @@ class NIKKEIScraper:
         return val_data
 
     def _fetch_etf_valuation(self):
-        ticker = yf.Ticker(self.etf_ticker)
-        info = ticker.info or {}
+        url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={self.etf_ticker}"
+        try:
+            resp = requests.get(url, headers=self.headers, timeout=20)
+            resp.raise_for_status()
+            data = resp.json()
+            result = data.get('quoteResponse', {}).get('result', [])
+            if not result:
+                print(f"❌ ETF 估值資料解析失敗：無結果")
+                return None
 
-        pe = info.get('trailingPE') or info.get('forwardPE')
-        div = info.get('trailingAnnualDividendYield') or info.get('dividendYield')
+            quote = result[0]
+            pe = quote.get('trailingPE') or quote.get('forwardPE')
+            div = quote.get('trailingAnnualDividendYield') or quote.get('dividendYield')
 
-        return {
-            'Trailing_PE': self._format_numeric(pe),
-            'Dividend_Yield': self._format_percent(div),
-        }
+            return {
+                'Trailing_PE': self._format_numeric(pe),
+                'Dividend_Yield': self._format_percent(div),
+            }
+        except Exception as e:
+            print(f"❌ ETF 估值 HTTP 抓取錯誤: {e}")
+            return None
 
     def _format_numeric(self, value):
         if value is None:
@@ -99,7 +109,6 @@ class NIKKEIScraper:
         if isinstance(value, (int, float)):
             return f"{value * 100:.2f}%"
         return str(value)
-
 
     def save_data(self):
         """儲存所有資料到 CSV"""
