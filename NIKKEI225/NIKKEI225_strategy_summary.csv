@@ -1,4 +1,4 @@
-Strategy,Final_Value_JPY,Total_Invested_JPY,CAGR_%,Data_Start,Data_End,Months
-Standard DCA,5403939,1810000,52.31,2011-04-30,2026-04-14,181
-Fixed Shares,4403853,1810000,59.54,2011-04-30,2026-04-14,181
-Value Averaging,3273710,832012,47.29,2011-04-30,2026-04-14,181
+Strategy,Final_Value_JPY,Total_Invested_JPY,Monthly_IRR_%,Annual_IRR_%,Data_Start,Data_End,Months
+Standard DCA,5427632,1810000,1.06,13.51,2011-04-30,2026-04-15,181
+Fixed Shares,4421721,1810000,1.09,13.9,2011-04-30,2026-04-15,181
+Value Averaging,3288238,832012,1.09,13.92,2011-04-30,2026-04-15,181

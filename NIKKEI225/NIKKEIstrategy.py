@@ -2,6 +2,10 @@
 import os
 import pandas as pd
 import numpy as np
+try:
+    import numpy_financial as npf
+except ImportError:
+    npf = None
 import matplotlib.pyplot as plt
 from datetime import datetime
 
@@ -77,21 +81,39 @@ class NIKKEIStrategy:
         self.results['Value_Averaging'] = self._make_result(df)
 
     def _make_result(self, df):
-        years = (df.index[-1] - df.index[0]).days / 365.25
         final_value = df['Portfolio_Value'].iloc[-1]
         total_invested = df['Total_Invested'].iloc[-1]
-        start_value = df['Portfolio_Value'].replace(0, np.nan).ffill().iloc[0]
-        if years > 0 and start_value > 0:
-            cagr = ((final_value / start_value) ** (1 / years) - 1) * 100
-        else:
-            cagr = 0.0
+
+        monthly_irr = self._calculate_irr(df)
+        annual_irr = (1 + monthly_irr) ** 12 - 1 if monthly_irr is not None else 0.0
 
         return {
             'final_value': final_value,
             'total_invested': total_invested,
-            'cagr': cagr,
+            'monthly_irr': monthly_irr,
+            'annual_irr': annual_irr,
             'df': df
         }
+
+    def _calculate_irr(self, df):
+        cash_flows = (-df['Investment']).tolist()
+        if not cash_flows:
+            return 0.0
+
+        cash_flows[-1] += df['Portfolio_Value'].iloc[-1]
+
+        try:
+            if npf is not None:
+                irr = npf.irr(cash_flows)
+            else:
+                print('Warning: numpy_financial not installed, using numpy.irr as fallback.')
+                irr = np.irr(cash_flows)
+            if irr is None or not np.isfinite(irr):
+                return 0.0
+            return irr
+        except Exception as e:
+            print(f"IRR 計算錯誤：{e}")
+            return 0.0
 
     def compare_results(self):
         print("\n" + "="*70)
@@ -99,9 +121,10 @@ class NIKKEIStrategy:
         print("="*70)
         for name, res in self.results.items():
             print(f"\n{name.replace('_', ' ')}:")
-            print(f"  最終組合價值     : {res['final_value']:,.0f} JPY")
-            print(f"  總投入金額       : {res['total_invested']:,.0f} JPY")
-            print(f"  年化報酬率 (CAGR): {res['cagr']:.2f}%")
+            print(f"  最終組合價值       : {res['final_value']:,.0f} JPY")
+            print(f"  總投入金額         : {res['total_invested']:,.0f} JPY")
+            print(f"  月度 IRR           : {res['monthly_irr']*100:.2f}%")
+            print(f"  年化 IRR           : {res['annual_irr']*100:.2f}%")
 
     def save_summary_csv(self):
         """彙整基本資料 + 策略結果到 CSV"""
@@ -111,7 +134,8 @@ class NIKKEIStrategy:
                 'Strategy': name.replace('_', ' '),
                 'Final_Value_JPY': round(res['final_value']),
                 'Total_Invested_JPY': round(res['total_invested']),
-                'CAGR_%': round(res['cagr'], 2),
+                'Monthly_IRR_%': round(res['monthly_irr'] * 100, 2),
+                'Annual_IRR_%': round(res['annual_irr'] * 100, 2),
                 'Data_Start': self.df.index[0].date(),
                 'Data_End': self.df.index[-1].date(),
                 'Months': len(self.df)
