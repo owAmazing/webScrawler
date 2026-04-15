@@ -241,7 +241,7 @@ if __name__ == "__main__":
     if not os.path.exists(csv_file):
         print(f"{csv_file} 不存在，將自動啟動 NIKKEIscraper 抓取最新資料。")
         try:
-            from NIKKEIscraper import NIKKEIScraper
+            from NIKKEI225.program.NIKKEIscraper import NIKKEIScraper
             scraper = NIKKEIScraper()
             dataset = scraper.build_dataset(years=15)
             dataset.to_csv(csv_file)
